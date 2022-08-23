@@ -32,7 +32,7 @@ allAWSResourcesWithStandardTags =
 # Warnings will be printed for all violations since the last parameter is true
 violatingAWSResources =
         plan.filter_attribute_not_contains_list(allAWSResourcesWithStandardTags,
-                        "all_tags", mandatory_tags, true)
+                        "tags_all", mandatory_tags, true)
 
 # Main rule
 main = rule {
