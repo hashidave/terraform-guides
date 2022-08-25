@@ -1,0 +1,160 @@
+##### Imports #####
+import "tfconfig/v2" as tfconfig
+import "strings"
+import "types"
+
+param mandatory_tags default ["Owner", "Folder"]
+
+### find_providers_by_type ###
+# Find all providers of a specific type using the tfconfig/v2 import.
+# The parameter, provider, should be given as a string such as "aws".
+find_providers_by_type = func(type) {
+  providers = filter tfconfig.providers as address, p {
+  	p.provider_config_key matches "(.*:)?" + type + "(\\..*)?"
+  }
+
+  return providers
+}
+
+
+### print_violations ###
+# Prints violations returned by any of the filter functions defined below.
+# This would normally only be called if the filter function had been called
+# with prtmsg set to false, which is sometimes done when processing resources
+# and their blocks.
+# If the result of a filter function is assigned to a map like violatingIRs,
+# then you should pass violatingIRs["message"] as the first argument.
+# The prefix argument is printed before the message of each resource.
+print_violations = func(messages, prefix) {
+  for messages as address, message {
+    print(prefix, message)
+  }
+  return true
+}
+
+### to_string ###
+# Convert objects of unknown type to string
+# It is used to build messages added to the messages map returned by the
+# filter functions
+to_string = func(obj) {
+  case types.type_of(obj) {
+    when "string":
+      return obj
+    when "int", "float", "bool":
+      return string(obj)
+    when "null":
+      return "null"
+    when "undefined":
+      return "undefined"
+    when "list":
+      output = "["
+      lastIndex = length(obj) - 1
+      for obj as index, value {
+        if index < lastIndex {
+          output += to_string(value) + ", "
+        } else {
+          output += to_string(value)
+        }
+      }
+      output += "]"
+      return output
+    when "map":
+      output = "{"
+      theKeys = keys(obj)
+      lastIndex = length(theKeys) - 1
+      for theKeys as index, key {
+        if index < lastIndex {
+          output += to_string(key) + ": " + to_string(obj[key]) + ", "
+        } else {
+          output += to_string(key) + ": " + to_string(obj[key])
+        }
+      }
+      output += "}"
+      return output
+    else:
+      return ""
+  }
+}
+
+
+
+### Validates that we have the specified set of default tags
+CheckForDefaultTags = func(providers, required, prtmsg) {
+  violators = {}
+  messages = {}
+  for providers as address, rc {
+    # Evaluate the value (v) of the attribute
+    
+    tags=null
+    #Find the tags
+    if (rc.config contains "default_tags"){
+      for rc.config.default_tags as field{
+        #Message=" Field is " + to_string(field)
+        #print (Message)
+        if field contains "tags" {
+          tags=keys(values(values(field)[0])[0])
+        }  
+      }
+    } 
+    if tags is not null{
+      missing_values=[]
+      
+      #print ("We have tags")
+      #print (tags)
+      #print ("Tags type is " + types.type_of(tags))
+      
+      for required as target{
+        #Message = "Required tag is: " + target
+        #print (Message)
+        
+        # Check if the value contains the desired allowed list
+        found =false  
+        for tags as tag{
+           #print ("type of the tag is " +types.type_of(tag))
+           #print ("Checking " + tag + " against target " + target)
+           if tag == target{
+             found=true
+           }
+        }  
+        if not found{
+          append(missing_values, target)  
+        }
+      }
+
+           
+      if length (missing_values) >0{
+        message = to_string(address) + " is missing default_tags: " + to_string(missing_values)
+        violators[address]=rc
+        messages[address]=message 
+        if prtmsg{
+          print(message)   
+        }
+      }  
+    }else{
+      # Add the resource and a warning message to the violators list
+      message = to_string(address) + " has no default_tags"
+      violators[address] = rc
+      messages[address] = message
+      if prtmsg {
+        print(message)
+      }
+    }    
+  } // end for
+  
+  return {"resources":violators,"messages":messages}
+}
+
+
+
+aws_providers=find_providers_by_type("aws")
+#message = "Providers Length=" + to_string (length(aws_providers))
+#print (message)
+
+
+aws_no_default_tags=CheckForDefaultTags(aws_providers,mandatory_tags, true)
+
+#print (aws_no_default_tags)
+
+main = rule {
+    length(aws_no_default_tags["resources"]) is 0
+}
