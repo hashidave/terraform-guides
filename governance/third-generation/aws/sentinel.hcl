@@ -14,10 +14,10 @@ module "aws-functions" {
   source = "./aws-functions/aws-functions.sentinel"
 }
 
-policy "enforce-mandatory-tags" {
-  source = "./enforce-mandatory-tags.sentinel"
-  enforcement_level = "advisory"
-}
+#policy "enforce-mandatory-tags" {
+#  source = "./enforce-mandatory-tags.sentinel"
+#  enforcement_level = "advisory"
+#}
 
 #policy "protect-against-rds-instance-deletion" {
 #  source = "./protect-against-rds-instance-deletion.sentinel"
